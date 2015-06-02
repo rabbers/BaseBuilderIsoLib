@@ -1,0 +1,37 @@
+<!DOCTYPE html />
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>ISO Map</title>
+        <style type="text/css">
+            #stage {
+                position:  absolute;
+                left: 0;
+                top: 0;
+            }
+        </style>
+        <script type="text/javascript" src="scripts/lib/base-builder-iso.js"></script>
+        <script type="text/javascript">
+            var map = new ISOBase();
+
+            var objid = map.MapObject_Add("gfx/obj/habitation.svg#Plane", null, { x: 99, y: 420 }, null);
+            map.MapObjects[objid].addComponent("gfx/obj/habitation.svg#Plane", null, { x: 99, y: 420 }, null);
+
+            alert(map.MapObjects[objid].get_XML());
+        </script>
+    </head>
+    <body>
+        <svg id="stage" style="background: black" height="100%" width="100%">
+            <g id="View" transform="translate(0 300) scale(0.5)">
+                <g transform="translate(0 0)">
+                    <use xlink:href="gfx/obj/habitation.svg#Plane" transform="translate(-99 -420)" />
+                    <use xlink:href="gfx/obj/habitation.svg#HabitationCyl2" transform="translate(-99 -420)" />
+                </g>
+                <g transform="translate(261.5 130.5)">
+                    <use xlink:href="gfx/obj/habitation.svg#Plane" transform="translate(-99 -420)" />
+                    <use xlink:href="gfx/obj/habitation.svg#HabitationCyl2" transform="translate(-99 -420)" />
+                </g>
+            </g>
+        </svg>
+    </body>
+</html>
