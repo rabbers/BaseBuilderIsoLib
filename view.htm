@@ -4,34 +4,55 @@
         <meta charset="utf-8" />
         <title>ISO Map</title>
         <style type="text/css">
-            #stage {
+            #GameScreen {
                 position:  absolute;
                 left: 0;
                 top: 0;
+                width:  100%;
+                height:  100%;
+                background:  black;
             }
         </style>
+        <script type="text/javascript" src="scripts/lib/jquery-2.1.4.min.js"></script>
         <script type="text/javascript" src="scripts/lib/base-builder-iso.js"></script>
         <script type="text/javascript">
-            var map = new ISOBase();
+            $(function () {
+                var map = new ISOBase(document.getElementById('GameScreen'));
+                map.GridVx = { x: 65.28, y: 32.64 };
+                map.GridVy = { x: -65.28, y: 32.64 };
 
-            var objid = map.MapObject_Add("gfx/obj/habitation.svg#Plane", null, { x: 99, y: 420 }, null);
-            map.MapObjects[objid].addComponent("gfx/obj/habitation.svg#Plane", null, { x: 99, y: 420 }, null);
+                map.initialize();
 
-            alert(map.MapObjects[objid].get_XML());
+                //Habitation Module
+                var objid = map.mapObject_Add("gfx/obj/habitation.svg#Plane", null, { x: 426.97, y: 258.32 }, { width: 4, height: 5 }, { name: 'Habitation Module' });
+                map.MapObjects[objid].addComponent("gfx/obj/habitation.svg#HabitationCyl2", null, { x: 426.97, y: 258.32 }, { width: 4, height: 5 });
+
+                var view = map.Screen.find('.ISOMapView');
+
+                for (var i = 0; i < map.MapSize.x; i += 4) {
+                    for (var j = 0; j < map.MapSize.y; j += 5) {
+                        var po = map.MapObjects[objid].placeOnMap(map, i, j);
+                        $(po.groupelement).click(function () {
+                            var po = $(this).data('isomapplacedobject');
+                            alert(po.attributes.name + " (" + po.x + ", " + po.y + ")");
+                        });
+                        /*
+                        $(po.groupelement).mouseenter(function () {
+                        var po = $(this).data('isomapplacedobject');
+                        console.log('Enter ' + po.attributes.name);
+                        });
+                        $(po.groupelement).mouseleave(function () {
+                        var po = $(this).data('isomapplacedobject');
+                        console.log('Enter ' + po.attributes.name);
+                        });
+                        */
+                    }
+                }
+                map.centerOn(32, 32);
+            });
         </script>
     </head>
     <body>
-        <svg id="stage" style="background: black" height="100%" width="100%">
-            <g id="View" transform="translate(0 300) scale(0.5)">
-                <g transform="translate(0 0)">
-                    <use xlink:href="gfx/obj/habitation.svg#Plane" transform="translate(-99 -420)" />
-                    <use xlink:href="gfx/obj/habitation.svg#HabitationCyl2" transform="translate(-99 -420)" />
-                </g>
-                <g transform="translate(261.5 130.5)">
-                    <use xlink:href="gfx/obj/habitation.svg#Plane" transform="translate(-99 -420)" />
-                    <use xlink:href="gfx/obj/habitation.svg#HabitationCyl2" transform="translate(-99 -420)" />
-                </g>
-            </g>
-        </svg>
+        <div id="GameScreen"></div>
     </body>
 </html>
