@@ -27,6 +27,7 @@
                 var objid = map.mapObject_Add("gfx/obj/habitation.svg#Plane", null, { x: 426.97, y: 258.32 }, { width: 4, height: 5 }, { name: 'Habitation Module' });
                 map.MapObjects[objid].addComponent("gfx/obj/habitation.svg#HabitationCyl2", null, { x: 426.97, y: 258.32 }, { width: 4, height: 5 });
 
+                var stage = map.Screen.find('.ISOMapStage');
                 var view = map.Screen.find('.ISOMapView');
 
                 for (var i = 0; i < map.MapSize.x; i += 4) {
@@ -36,11 +37,13 @@
                             var po = $(this).data('isomapplacedobject');
                             alert(po.attributes.name + " (" + po.x + ", " + po.y + ")");
                         });
-                        /*
                         $(po.groupelement).mouseenter(function () {
-                        var po = $(this).data('isomapplacedobject');
-                        console.log('Enter ' + po.attributes.name);
+                            var po = $(this).data('isomapplacedobject');
+                            console.log('Enter ' + po.attributes.name);
+
+                            map.setEncompassCursor(po.x, po.y);
                         });
+                        /*
                         $(po.groupelement).mouseleave(function () {
                         var po = $(this).data('isomapplacedobject');
                         console.log('Enter ' + po.attributes.name);
@@ -49,8 +52,16 @@
                     }
                 }
                 map.centerOn(32, 32);
+
+                /*
+                stage.mousemove(function (e) {
+                    var grid = map.screenToGrid(e.offsetX, e.offsetY);
+                    map.setEncompassCursor(grid.x, grid.y);
+                });
+                */
             });
         </script>
+
     </head>
     <body>
         <div id="GameScreen"></div>

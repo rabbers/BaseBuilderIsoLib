@@ -1,6 +1,13 @@
+ISOMapFlags = {
+    Blocked_Mask: 3,
+    Blocked_Clear: 0,
+    Blocked_Blocked: 1,
+    Blocked_Callback: 2
+};
 function ISOMapCell() {
     return {
-        isoplacedobject: null        
+        isoplacedobject: null,
+        flags: 0
     }
 }
 function ISOMapPlacedObject(isomapobject, gx, gy, attributes) {
@@ -13,12 +20,11 @@ function ISOMapPlacedObject(isomapobject, gx, gy, attributes) {
     }
 }
 
-function ISOMapComponent(href, boundingbox, baseorigin, basesize) {
+function ISOMapComponent(href, boundingbox, baseorigin) {
     return {
         href: href,
         boundingbox: boundingbox,
         baseorigin: baseorigin,
-        basesize: basesize,
         
         get_XML: function() {
             return '<use xlink:href="'+href+'" transform="translate(-'+baseorigin.x+' -'+baseorigin.y+')" />';
@@ -28,7 +34,7 @@ function ISOMapComponent(href, boundingbox, baseorigin, basesize) {
 function ISOMapObject(href, boundingbox, baseorigin, basesize, defaultattributes) {
     var $self = {
         Components: [],
-        BaseSize: basesize,
+        basesize: basesize,
         DefaultAttributes: defaultattributes,
 
         get_XML: function () {
@@ -38,8 +44,8 @@ function ISOMapObject(href, boundingbox, baseorigin, basesize, defaultattributes
             }
             return xml;
         },
-        addComponent: function (href, boundingbox, baseorigin, basesize) {
-            this.Components[this.Components.length] = new ISOMapComponent(href, boundingbox, baseorigin, basesize);
+        addComponent: function (href, boundingbox, baseorigin) {
+            this.Components[this.Components.length] = new ISOMapComponent(href, boundingbox, baseorigin);
             return this.Components.length - 1;
         },
         placeOnMap: function (isobase, gx, gy) {
@@ -48,7 +54,7 @@ function ISOMapObject(href, boundingbox, baseorigin, basesize, defaultattributes
             return p;
         }
     }
-    $self.addComponent(href, boundingbox, baseorigin, basesize);
+    $self.addComponent(href, boundingbox, baseorigin);
     return $self;
 }
 function ISOBase(screen) {
@@ -86,6 +92,9 @@ function ISOBase(screen) {
             $svg.appendTo(this.Screen);
 
             var $g = $(this.makeSVG('g', { class: "ISOMapView", transform: "translate(0 0) scale(1.0)" }));
+            $g.appendTo($svg);
+
+            var $g = $(this.makeSVG('g', { class: "ISOMapGizmos", transform: "translate(0 0) scale(1.0)" }));
             $g.appendTo($svg);
         },
 
@@ -154,30 +163,39 @@ function ISOBase(screen) {
 
             return { x: sx, y: sy };
         },
+        screenToGrid: function (sx, sy) {
+            var gx = -(this.GridVy.x * (this._Origin.y - sy) + this.GridVy.y * (sx - this._Origin.x)) / (this.GridVx.y * this.GridVy.x - this.GridVx.x * this.GridVy.y);
+            var gy = (this.GridVx.x * (this._Origin.y - sy) + this.GridVx.y * (sx - this._Origin.x)) / (this.GridVx.y * this.GridVy.x - this.GridVx.x * this.GridVy.y);
+
+            return { x: gx, y: gy }
+        },
+
         placeObject: function (isomapplacedobject) {
             var po = isomapplacedobject;
             var o = po.isomapobject;
 
-            //At least one square must be placed on the grid before the obect will render
+            //At least one square must be placed on the grid before the object will render
             if (
-                o.BaseSize.width == 0 ||
-                po.x + o.BaseSize.width - 1 < 0 ||
+                o.basesize.width == 0 ||
+                po.x + o.basesize.width - 1 < 0 ||
                 po.x >= this.MapSize.x ||
 
-                o.BaseSize.Height == 0 ||
-                po.y + o.BaseSize.height - 1 < 0 ||
+                o.basesize.Height == 0 ||
+                po.y + o.basesize.height - 1 < 0 ||
                 po.y >= this.MapSize.y) {
                 return;
             }
             var x1 = Math.max(po.x, 0);
             var y1 = Math.max(po.y, 0);
-            var x2 = Math.min(po.x + o.BaseSize.width - 1, this.MapSize.x - 1);
-            var y2 = Math.min(po.y + o.BaseSize.height - 1, this.MapSize.y - 1);
+            var x2 = Math.min(po.x + o.basesize.width - 1, this.MapSize.x - 1);
+            var y2 = Math.min(po.y + o.basesize.height - 1, this.MapSize.y - 1);
 
             for (var i = x1; i <= x2; i++) {
                 for (var j = y1; j <= y2; j++) {
                     try {
-                        this._MapData[j][i].isoplacedobject = po;
+                        var cell = this._MapData[j][i];
+                        cell.isoplacedobject = po;
+                        cell.flags |= ISOMapFlags.Blocked_Blocked;
                     } catch (e) {
                     }
                 }
@@ -189,6 +207,50 @@ function ISOBase(screen) {
             g.innerHTML = o.get_XML();
             $(g).appendTo(this.Screen.find('.ISOMapView'));
             $(g).data('isomapplacedobject', po);
+        },
+        clearCursor: function () {
+            var cursor = this.Screen.find('.ISOMapGizmos .cursor');
+            cursor.remove();
+        },
+        setCursor: function (gx, gy, w, h) {
+            this.clearCursor();
+            var p0 = this.gridToScreen(Math.floor(gx), Math.floor(gy));
+            var x0 = p0.x;
+            var y0 = p0.y;
+            var p = {
+                0: { x: x0, y: y0 },
+                1: { x: x0 + this.GridVx.x * w, y: y0 + this.GridVx.y * w },
+                2: { x: x0 + this.GridVx.x * w + this.GridVy.x * h, y: y0 + this.GridVx.y * w + this.GridVy.y * h },
+                3: { x: x0 + this.GridVy.x * h, y: y0 + this.GridVy.y * h}
+            };
+            var path = this.makeSVG('path', {
+                "d": 'M ' + p[0].x + ' ' + p[0].y + ' L ' + p[1].x + ' ' + p[1].y + ' L ' + p[2].x + ' ' + p[2].y + ' L ' + p[3].x + ' ' + p[3].y + ' z',
+                "class": "cursor",
+                "style": "fill:#00ff00;fill-rule:evenodd;stroke:#00ff00;stroke-width:2.8;stroke-linejoin:miter;stroke-opacity:1;opacity:0.25;"
+            });
+            $(path).appendTo(this.Screen.find('.ISOMapGizmos'));
+        },
+        setEncompassCursor: function(gx, gy) {
+            this.clearCursor();
+            gx = Math.floor(gx);
+            gy = Math.floor(gy);
+
+            if (gx < 0 || gy < 0 || gx >= this.MapSize.x || gy >= this.MapSize.y) return;
+
+            var cell = this._MapData[gy][gx];
+
+            var w = 1;
+            var h = 1;
+            if (cell.isoplacedobject) {
+                var po = cell.isoplacedobject;
+                gx = po.x;
+                gy = po.y;
+                w = po.isomapobject.basesize.width;
+                h = po.isomapobject.basesize.height;                
+            }
+
+            this.setCursor(gx, gy, w, h);
+            
         }
     };
 
