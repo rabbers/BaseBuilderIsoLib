@@ -75,6 +75,15 @@ function ISOBase(screen) {
         Overscroll: { x: screen.width / 3, y: screen.height / 3 },
         BoundingBox: { width: 0, height: 0 },
 
+        //Interactivity parameters
+        AutoCursorType: "Place",        //Query - hilight current object - intent- hilight base of object and over-render a ghost object
+        //Place - identify placement options - intent - objects can be in 3 modes, in any case, base indicates unusable space square by square
+        //Mode 1: Object to be placed only in space - green border if placeable, red otherwise
+        //Mode 2: Object to be placed only adjacent to other objects - cursor aligns to nearby if adjacent before calculateing colours
+        //Mode 3: Object to be placed only on squares already filled with other objects - cursor aligns to object, then works out if placeable
+        SelectedObject: null,
+        AutoCursorCanPlace: false,      //Result of rendering last cursor
+
         //Internal state
         _Origin: { x: 0, y: 0 },    //0,0 point of ISO space in View space at 100%
         _MapData: null,             //An array of arrays of object
@@ -90,12 +99,16 @@ function ISOBase(screen) {
             this.Screen.css({ overflow: 'scroll' });
             var $svg = $(this.makeSVG('svg', { class: 'ISOMapStage', width: '100%', height: '100%' }));
             $svg.appendTo(this.Screen);
+            $svg.data('isobase', this);
 
             var $g = $(this.makeSVG('g', { class: "ISOMapView", transform: "translate(0 0) scale(1.0)" }));
             $g.appendTo($svg);
+            $g.data('isobase', this);
 
             var $g = $(this.makeSVG('g', { class: "ISOMapGizmos", transform: "translate(0 0) scale(1.0)" }));
             $g.appendTo($svg);
+            $g.css({ pointerEvents: 'none' });
+            $g.data('isobase', this);
         },
 
         //Initialize clears all visible objects from managed view and clears all map grid data
@@ -116,7 +129,10 @@ function ISOBase(screen) {
             var screenwidth = this.BackgroundOverscan.left + this.BackgroundOverscan.right + basegridwidth;
             var screenheight = this.BackgroundOverscan.top + this.BackgroundOverscan.bottom + basegridheight;
 
-            this.Screen.find('.ISOMapStage').css({ width: screenwidth, height: screenheight });
+            var $stage = this.Screen.find('.ISOMapStage');
+            $stage.css({ width: screenwidth, height: screenheight });
+            $stage.mousemove(this.handle_stageMouseMove);
+            $stage.click(this.handle_stageClick);
 
             this._Origin.x = this.BackgroundOverscan.left + basegridwidth / 2;
             this._Origin.y = this.BackgroundOverscan.top;
@@ -221,7 +237,7 @@ function ISOBase(screen) {
                 0: { x: x0, y: y0 },
                 1: { x: x0 + this.GridVx.x * w, y: y0 + this.GridVx.y * w },
                 2: { x: x0 + this.GridVx.x * w + this.GridVy.x * h, y: y0 + this.GridVx.y * w + this.GridVy.y * h },
-                3: { x: x0 + this.GridVy.x * h, y: y0 + this.GridVy.y * h}
+                3: { x: x0 + this.GridVy.x * h, y: y0 + this.GridVy.y * h }
             };
             var path = this.makeSVG('path', {
                 "d": 'M ' + p[0].x + ' ' + p[0].y + ' L ' + p[1].x + ' ' + p[1].y + ' L ' + p[2].x + ' ' + p[2].y + ' L ' + p[3].x + ' ' + p[3].y + ' z',
@@ -230,7 +246,7 @@ function ISOBase(screen) {
             });
             $(path).appendTo(this.Screen.find('.ISOMapGizmos'));
         },
-        setEncompassCursor: function(gx, gy) {
+        setEncompassCursor: function (gx, gy) {
             this.clearCursor();
             gx = Math.floor(gx);
             gy = Math.floor(gy);
@@ -246,11 +262,73 @@ function ISOBase(screen) {
                 gx = po.x;
                 gy = po.y;
                 w = po.isomapobject.basesize.width;
-                h = po.isomapobject.basesize.height;                
+                h = po.isomapobject.basesize.height;
             }
 
             this.setCursor(gx, gy, w, h);
-            
+        },
+        handle_autoQuery: function () {
+            if (this.AutoCursorType == "Query") {
+                var po = $(this).data('isomapplacedobject');
+                if (po != null) {
+                    //console.log('Enter ' + po.attributes.name);
+                    map.setEncompassCursor(po.x, po.y);
+                }
+            }
+        },
+        setBasicPlaceCursor: function (o, gx, gy) {
+            this.clearCursor();
+            var w = o.basesize.width;
+            var h = o.basesize.height;
+            var fill = "";
+
+            gx = Math.floor(gx);
+            gy = Math.floor(gy);
+
+            this.AutoCursorCanPlace = true;
+            var p0 = this.gridToScreen(gx, gy);
+            for (var j = 0; j < h; j++) {
+                var x0 = p0.x + this.GridVy.x * j;
+                var y0 = p0.y + this.GridVy.y * j;
+                for (var i = 0; i < w; i++, x0 += this.GridVx.x, y0 += this.GridVx.y) {
+                    var blockeddata = this._MapData[gy + j][gx + i].flags & ISOMapFlags.Blocked_Mask;
+
+                    if (blockeddata == 0) {
+                        fill = "#00ff00";
+                    } else {
+                        //TODO: check call back flag and 'ask' the object
+                        fill = "#ff0000";
+                        this.AutoCursorCanPlace = false;
+                    }
+                    var p = {
+                        0: { x: x0, y: y0 },
+                        1: { x: x0 + this.GridVx.x, y: y0 + this.GridVx.y },
+                        2: { x: x0 + this.GridVx.x + this.GridVy.x, y: y0 + this.GridVx.y + this.GridVy.y },
+                        3: { x: x0 + this.GridVy.x, y: y0 + this.GridVy.y }
+                    };
+                    var path = this.makeSVG('path', {
+                        "d": 'M ' + p[0].x + ' ' + p[0].y + ' L ' + p[1].x + ' ' + p[1].y + ' L ' + p[2].x + ' ' + p[2].y + ' L ' + p[3].x + ' ' + p[3].y + ' z',
+                        "class": "cursor",
+                        "style": "fill:" + fill + ";fill-rule:evenodd;stroke:#00ff00;stroke-width:2.8;stroke-linejoin:miter;stroke-opacity:1;opacity:0.25;"
+                    });
+                    $(path).appendTo(this.Screen.find('.ISOMapGizmos'));
+                }
+            }
+        },
+        handle_stageMouseMove: function (e) {
+            var map = $(this).data('isobase');
+            if (map.AutoCursorType == "Place" && map.SelectedObject != null) {
+                var grid = map.screenToGrid(e.offsetX, e.offsetY);
+                map.setBasicPlaceCursor(map.SelectedObject, grid.x, grid.y);
+            }
+        },
+        handle_stageClick: function (e) {
+            var map = $(this).data('isobase');
+            if (map.AutoCursorType == "Place" && map.SelectedObject != null && map.AutoCursorCanPlace) {
+                var grid = map.screenToGrid(e.offsetX, e.offsetY);
+                map.SelectedObject.placeOnMap(map, Math.floor(grid.x), Math.floor(grid.y));
+                map.setBasicPlaceCursor(map.SelectedObject, grid.x, grid.y);
+            }
         }
     };
 

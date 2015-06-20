@@ -30,35 +30,20 @@
                 var stage = map.Screen.find('.ISOMapStage');
                 var view = map.Screen.find('.ISOMapView');
 
-                for (var i = 0; i < map.MapSize.x; i += 4) {
+/*                for (var i = 0; i < map.MapSize.x; i += 4) {
                     for (var j = 0; j < map.MapSize.y; j += 5) {
                         var po = map.MapObjects[objid].placeOnMap(map, i, j);
-                        $(po.groupelement).click(function () {
-                            var po = $(this).data('isomapplacedobject');
-                            alert(po.attributes.name + " (" + po.x + ", " + po.y + ")");
-                        });
                         $(po.groupelement).mouseenter(function () {
                             var po = $(this).data('isomapplacedobject');
                             console.log('Enter ' + po.attributes.name);
 
                             map.setEncompassCursor(po.x, po.y);
                         });
-                        /*
-                        $(po.groupelement).mouseleave(function () {
-                        var po = $(this).data('isomapplacedobject');
-                        console.log('Enter ' + po.attributes.name);
-                        });
-                        */
                     }
                 }
+*/
                 map.centerOn(32, 32);
-
-                /*
-                stage.mousemove(function (e) {
-                    var grid = map.screenToGrid(e.offsetX, e.offsetY);
-                    map.setEncompassCursor(grid.x, grid.y);
-                });
-                */
+                map.SelectedObject = map.MapObjects[objid];
             });
         </script>
 
